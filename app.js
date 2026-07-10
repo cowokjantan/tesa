@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     tokenAddress: "0x0c978fcf859782619556201919ba8f946db5ba75", // Verified Production CA
     burnAddress: "0x000000000000000000000000000000000000dEaD",
     // Pool Pair Address Uniswap V3 untuk OXID/WETH di Robinhood Chain (Bypass standard token cache)
-    pairAddress: "0xae479a9ef1c9779dfecfa4c7484d8f1e569ce45f" 
+    pairAddress: "0xF5329A8115Ac7784b37d1A0D560b43B027270677" 
   };
 
   const minERC20ABI = [
@@ -46,6 +46,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   let symbol = "OXID";
   let initialNetworkBlock = 0;
 
+  // HELPER ENGINE: Mengubah angka desimal mikro menjadi format subskrip (Contoh: 0.0₄5230)
+  function formatMicroPrice(value) {
+    const num = parseFloat(value);
+    if (isNaN(num) || num === 0) return "$0.00";
+    if (num >= 0.0001) return `$${num.toFixed(4)}`;
+
+    // Ubah ke string notasi ilmiah untuk mendeteksi jumlah angka nol
+    const str = num.toFixed(20); 
+    const match = str.match(/^0\.(0+)([1-9]\d*)$/);
+    
+    if (match) {
+      const zeroCount = match[1].length;
+      const significantDigits = match[2].slice(0, 4); // Ambil 4 angka penting di belakangnya
+      const subscriptMap = {
+        '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄',
+        '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉'
+      };
+      const subscriptZeroes = zeroCount.toString().split('').map(d => subscriptMap[d]).join('');
+      return `$0.0${subscriptZeroes}${significantDigits}`;
+    }
+    return `$${num.toFixed(8)}`;
+  }
+
   // CHART ENGINE INITIALIZATION (Strict Cumulative Linear Pathing)
   function initChart() {
     const el = document.getElementById('oxideBurnChart');
@@ -80,7 +103,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 1. DYNAMIC PAIR-BASED DEXSCREENER ENGINE INTERACTION
   async function fetchMarketTelemetry() {
     try {
-      // Mengambil data pair pool langsung dari API DexScreener untuk memotong jalur cache data token biasa
       const response = await fetch(`https://api.dexscreener.com/latest/dex/pairs/robinhood-chain/${ROBINHOOD_CONFIG.pairAddress}`);
       if (!response.ok) throw new Error("DexScreener API limits hit or indexer offline");
 
@@ -89,17 +111,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const primaryPair = json.pairs[0];
 
-      // Format Angka Desimal Presisi Tinggi
-      const usdPrice = parseFloat(primaryPair.priceUsd || 0);
-      const wethPrice = parseFloat(primaryPair.priceNative || 0);
-
+      // Formatter UI untuk Harga Menggunakan Subskrip Desimal Mikro
       const elPriceUsd = document.getElementById('mkt-price-usd');
       const elPriceWeth = document.getElementById('mkt-price-weth');
 
-      if (elPriceUsd) elPriceUsd.textContent = usdPrice < 0.0001 ? `$${usdPrice.toFixed(8)}` : `$${usdPrice.toFixed(4)}`;
-      if (elPriceWeth) elPriceWeth.textContent = `${wethPrice.toFixed(8)} WETH`;
+      if (elPriceUsd) elPriceUsd.textContent = formatMicroPrice(primaryPair.priceUsd);
+      if (elPriceWeth) {
+        const wethPrice = parseFloat(primaryPair.priceNative || 0);
+        elPriceWeth.textContent = wethPrice < 0.0001 ? `${wethPrice.toFixed(10)} WETH` : `${wethPrice.toFixed(6)} WETH`;
+      }
 
-      // Format Satuan Likuiditas & Kapitalisasi Pasar (K / M / B) seperti DexScreener Dashboard
+      // Format Satuan K / M / B untuk Likuiditas & Kapitalisasi Pasar
       const formatDexMetric = (value) => {
         const num = parseFloat(value);
         if (isNaN(num) || num === 0) return "$0";
