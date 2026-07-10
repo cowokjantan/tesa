@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     ],
     tokenAddress: "0x0c978fcf859782619556201919ba8f946db5ba75", // Verified Production CA
     burnAddress: "0x000000000000000000000000000000000000dEaD",
-    // Pool Pair Address Uniswap V3 untuk IBG/WETH di Robinhood Chain (Bypass standard token cache)
+    // Pool Pair Address Uniswap V3 untuk OXID/WETH di Robinhood Chain (Bypass standard token cache)
     pairAddress: "0xae479a9ef1c9779dfecfa4c7484d8f1e569ce45f" 
   };
 
