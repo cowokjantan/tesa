@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Oxide Protocol · On-Chain Deflationary Terminal</title>
+  <meta name="description" content="Real-time algorithmic burn monitoring and live market telemetry for $OXID on Robinhood Chain.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Pro-Grade Production Web3 & Charting Provider SDKs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- PREMIUM TOP NAVIGATION TERMINAL -->
+    <header class="app-header">
+      <div class="brand-group">
+        <div class="brand-logo">[&nbsp;OXID&nbsp;]</div>
+        <h1 class="brand-name">Oxide Protocol</h1>
+      </div>
+      <div class="nav-actions">
+        <div class="crypto-badge ca-badge">
+          <span class="label">CA:</span>
+          <span class="value" id="ca-value">SYNCING...</span>
+        </div>
+        <a class="btn btn-primary" id="btn-buy" target="_blank" rel="noopener">Trade $OXID ↗</a>
+      </div>
+    </header>
+
+    <!-- LIVE TELEMETRY TICKER STATUS -->
+    <div class="ticker-ribbon">
+      <span class="status-pulse" id="status-dot"></span>
+      <p class="ticker-text" id="live-ticker-text">Establishing persistent handshake with Robinhood Chain RPC Node...</p>
+    </div>
+
+    <!-- MAIN DASHBOARD CONTENT GRID -->
+    <main class="dashboard-grid">
+      
+      <!-- LEFT COLUMN: REAL-TIME MARKET INTELLIGENCE (DexScreener/Gecko UI Standard) -->
+      <section class="panel panel-stats">
+        <div class="stat-box">
+          <span class="stat-label">PRICE USD</span>
+          <div class="stat-value text-highlight" id="mkt-price-usd">$0.00000000</div>
+          <span class="stat-subtext" id="mkt-price-weth">0.00000000 WETH</span>
+        </div>
+        
+        <div class="stat-box">
+          <span class="stat-label">LIQUIDITY & MARKET VALUE</span>
+          <div class="stat-row">
+            <span class="sub-label">Liquidity Pool:</span>
+            <span class="sub-value" id="mkt-liquidity">$0.00</span>
+          </div>
+          <div class="stat-row">
+            <span class="sub-label">Market Capitalization:</span>
+            <span class="sub-value" id="mkt-cap">$0.00</span>
+          </div>
+          <span class="stat-subtext">Fully Diluted Valuation (FDV): <span id="mkt-fdv">$0.00</span></span>
+        </div>
+
+        <div class="stat-box">
+          <span class="stat-label">MARKET TIME PERFORMANCE</span>
+          <div class="interval-group">
+            <div class="interval-card">
+              <span class="timeframe">5M</span>
+              <span class="percentage" id="perf-5m">0.00%</span>
+            </div>
+            <div class="interval-card">
+              <span class="timeframe">1H</span>
+              <span class="percentage" id="perf-1h">0.00%</span>
+            </div>
+            <div class="interval-card">
+              <span class="timeframe">24H</span>
+              <span class="percentage" id="perf-24h">0.00%</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT COLUMN: THE FURNACE CORE ENGINE -->
+      <section class="panel panel-furnace">
+        <span class="panel-eyebrow">Deflationary Supply Matrix</span>
+        <h2 class="hero-burned-amount" id="furnace-total-burned">0.00 <span class="ticker-suffix">OXID</span></h2>
+        
+        <p class="furnace-summary">
+          A definitive <strong id="furnace-pct-burned">0.00%</strong> of the total circulating issuance has been permanently expunged via black-hole transmission to the dead contract address: <code class="address-link" id="burn-address">0x00...dEaD</code>.
+        </p>
+
+        <div class="timestamp-block" id="furnace-timestamp">
+          Syncing on-chain block indexing...
+        </div>
+
+        <div class="architecture-info">
+          <h3>Autonomous Incineration Pipeline</h3>
+          <p class="desc">Every single protocol-side transaction fee routed through the smart contract architecture instantly executes public on-chain buybacks from the open market liquidity pools, immediately pushing the asset price floor up and purging the native float forever.</p>
+        </div>
+      </section>
+
+      <!-- FULL WIDTH ACCUMULATION AREA CHART -->
+      <section class="panel-full">
+        <h3 class="chart-title">Oxidation Velocity Curve & Accumulation Trend Line</h3>
+        <div class="chart-wrapper">
+          <canvas id="oxideBurnChart"></canvas>
+        </div>
+      </section>
+
+      <!-- FULL WIDTH IMMUTABLE EVENT LEDGER LOGS -->
+      <section class="panel-full">
+        <div class="section-header">
+          <h3>Real-time Deflationary Ledger</h3>
+          <span class="subtitle">Live cryptographic events pulled directly from smart contract event logs</span>
+        </div>
+        <div class="ledger-list" id="ledger-container">
+          <div class="loading-text">Listening for automated on-chain Transfer events...</div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- PRO-GRADE INFRASTRUCTURE FOOTER -->
+    <footer class="app-footer">
+      <div class="footer-ca">Verified Smart Contract: <span class="mono" id="footer-ca-text">—</span></div>
+      <div class="footer-rpc">Data Gateway: Network Sync Verified via <a href="https://robinhoodchain.blockscout.com" target="_blank" rel="noopener">Robinhood Chain Blockscout</a></div>
+    </footer>
+  </div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
