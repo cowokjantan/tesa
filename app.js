@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // CRITICAL PRODUCTION ROBINHOOD CHAIN HARDWARE CONFIGURATION
   const ROBINHOOD_CONFIG = {
     rpcUrl: "https://rpc.mainnet.chain.robinhood.com/", // URL RPC Resmi Robinhood Chain Mainnet
-    tokenAddress: "0x3a9D7C260F00000000000000000000000000OXID", // Ganti dengan alamat kontrak asli Anda setelah deploy
+    tokenAddress: "0x0c978fcf859782619556201919ba8f946db5ba75", // Ganti dengan alamat kontrak asli Anda setelah deploy
     burnAddress: "0x000000000000000000000000000000000000dEaD",
     geckoNetworkId: "robinhood-chain" // Slug ID jaringan resmi untuk GeckoTerminal API
   };
