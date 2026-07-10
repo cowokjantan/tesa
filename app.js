@@ -75,33 +75,53 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // 1. GENUINE GECKOTERMINAL API MARKET ENGINE INTERACTION
+  // 1. DIRECT DEXSCREENER API MARKET ENGINE (Instant & Synchronized)
   async function fetchMarketTelemetry() {
     try {
-      const response = await fetch(`https://api.geckoterminal.com/api/v2/networks/${ROBINHOOD_CONFIG.geckoNetworkId}/tokens/${ROBINHOOD_CONFIG.tokenAddress}`);
-      if (!response.ok) throw new Error("API stream limits hit or pool not initialized on DEX router");
+      // Mengambil data pasar real-time langsung dari API DexScreener berdasarkan Token CA
+      const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${ROBINHOOD_CONFIG.tokenAddress}`);
+      
+      if (!response.ok) throw new Error("DexScreener API stream failure");
       
       const json = await response.json();
-      if (!json.data) return;
-      const attr = json.data.attributes;
+      
+      // Proteksi jika pair likuiditas belum terindeks di DexScreener
+      if (!json.pairs || json.pairs.length === 0) {
+        throw new Error("No active pairs found on DexScreener node");
+      }
 
-      document.getElementById('mkt-price-usd').textContent = `$${parseFloat(attr.price_usd).toFixed(8)}`;
-      document.getElementById('mkt-price-weth').textContent = `${parseFloat(attr.price_native).toFixed(10)} WETH`;
-      document.getElementById('mkt-liquidity').textContent = `$${parseFloat(attr.total_reserve_in_usd).toLocaleString(undefined, {maximumFractionDigits:0})}`;
-      document.getElementById('mkt-cap').textContent = `$${parseFloat(attr.market_cap_usd || attr.fdv_usd).toLocaleString(undefined, {maximumFractionDigits:0})}`;
-      document.getElementById('mkt-fdv').textContent = `$${parseFloat(attr.fdv_usd).toLocaleString(undefined, {maximumFractionDigits:0})}`;
+      // Ambil objek pair utama (likuiditas tertinggi)
+      const primaryPair = json.pairs[0]; 
 
-      updateIntervalUI('perf-5m', attr.price_change_percentage.m5);
-      updateIntervalUI('perf-1h', attr.price_change_percentage.h1);
-      updateIntervalUI('perf-24h', attr.price_change_percentage.h24);
+      // Update Native Market Metrics DOM Fields
+      document.getElementById('mkt-price-usd').textContent = `$${parseFloat(primaryPair.priceUsd).toFixed(8)}`;
+      document.getElementById('mkt-price-weth').textContent = `${parseFloat(primaryPair.priceNative).toFixed(10)} WETH`;
+      document.getElementById('mkt-liquidity').textContent = `$${parseFloat(primaryPair.liquidity.usd).toLocaleString(undefined, {maximumFractionDigits:0})}`;
+      document.getElementById('mkt-cap').textContent = `$${parseFloat(primaryPair.marketCap || primaryPair.fdv).toLocaleString(undefined, {maximumFractionDigits:0})}`;
+      document.getElementById('mkt-fdv').textContent = `$${parseFloat(primaryPair.fdv).toLocaleString(undefined, {maximumFractionDigits:0})}`;
+
+      // Cascade Timeframe Interval Matrix Elements
+      updateIntervalUI('perf-5m', primaryPair.priceChange.m5);
+      updateIntervalUI('perf-1h', primaryPair.priceChange.h1);
+      updateIntervalUI('perf-24h', primaryPair.priceChange.h24);
+
+      console.log("Telemetry successfully synced with DexScreener Core Node.");
 
     } catch (err) {
-      console.warn("Market metrics cooling down or liquidity pool awaiting initialization.");
+      console.warn("DexScreener Telemetry Warning:", err.message);
+      
+      // Fallback UI jika API DexScreener mengalami cooldown/limit
+      document.getElementById('mkt-price-usd').textContent = "$0.00 (Syncing)";
+      document.getElementById('mkt-price-weth').textContent = "0.00 WETH";
+      document.getElementById('mkt-liquidity').textContent = "$0.00";
+      document.getElementById('mkt-cap').textContent = "Awaiting Data";
+      document.getElementById('mkt-fdv').textContent = "Awaiting Data";
     }
   }
 
   function updateIntervalUI(elementId, value) {
     const element = document.getElementById(elementId);
+    if (!element) return;
     const numericValue = parseFloat(value || 0);
     element.textContent = `${numericValue >= 0 ? '+' : ''}${numericValue.toFixed(2)}%`;
     element.className = `percentage ${numericValue >= 0 ? 'text-green' : 'text-red'}`;
