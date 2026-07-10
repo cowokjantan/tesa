@@ -2,14 +2,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // CRITICAL PRODUCTION ROBINHOOD CHAIN HARDWARE CONFIGURATION
   const ROBINHOOD_CONFIG = {
-    // Primary official endpoint and secondary high-availability public gateway
     rpcUrls: [
       "https://rpc.mainnet.chain.robinhood.com/",
       "https://rpc.robinhoodchain.com"
     ],
     tokenAddress: "0x0c978fcf859782619556201919ba8f946db5ba75", // Verified Production CA
     burnAddress: "0x000000000000000000000000000000000000dEaD",
-    geckoNetworkId: "robinhood-chain" 
+    // Pool Pair Address Uniswap V3 untuk IBG/WETH di Robinhood Chain (Bypass standard token cache)
+    pairAddress: "0xae479a9ef1c9779dfecfa4c7484d8f1e569ce45f" 
   };
 
   const minERC20ABI = [
@@ -33,9 +33,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const ledgerContainer = document.getElementById('ledger-container');
 
   // Hard UI Hydration
-  caValue.textContent = `${ROBINHOOD_CONFIG.tokenAddress.slice(0, 6)}...${ROBINHOOD_CONFIG.tokenAddress.slice(-4)}`;
-  footerCaText.textContent = ROBINHOOD_CONFIG.tokenAddress;
-  btnBuy.setAttribute('href', `https://fun.noxa.fi/robinhood/token/${ROBINHOOD_CONFIG.tokenAddress}`);
+  if (caValue) caValue.textContent = `${ROBINHOOD_CONFIG.tokenAddress.slice(0, 6)}...${ROBINHOOD_CONFIG.tokenAddress.slice(-4)}`;
+  if (footerCaText) footerCaText.textContent = ROBINHOOD_CONFIG.tokenAddress;
+  if (btnBuy) btnBuy.setAttribute('href', `https://fun.noxa.fi/robinhood/token/${ROBINHOOD_CONFIG.tokenAddress}`);
 
   let burnChartInstance = null;
   let chartLabels = [];
@@ -48,7 +48,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // CHART ENGINE INITIALIZATION (Strict Cumulative Linear Pathing)
   function initChart() {
-    const ctx = document.getElementById('oxideBurnChart').getContext('2d');
+    const el = document.getElementById('oxideBurnChart');
+    if (!el) return;
+    const ctx = el.getContext('2d');
     burnChartInstance = new Chart(ctx, {
       type: 'line',
       data: {
@@ -75,47 +77,55 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // 1. DIRECT DEXSCREENER API MARKET ENGINE (Instant & Synchronized)
+  // 1. DYNAMIC PAIR-BASED DEXSCREENER ENGINE INTERACTION
   async function fetchMarketTelemetry() {
     try {
-      // Mengambil data pasar real-time langsung dari API DexScreener berdasarkan Token CA
-      const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${ROBINHOOD_CONFIG.tokenAddress}`);
-      
-      if (!response.ok) throw new Error("DexScreener API stream failure");
-      
+      // Mengambil data pair pool langsung dari API DexScreener untuk memotong jalur cache data token biasa
+      const response = await fetch(`https://api.dexscreener.com/latest/dex/pairs/robinhood-chain/${ROBINHOOD_CONFIG.pairAddress}`);
+      if (!response.ok) throw new Error("DexScreener API limits hit or indexer offline");
+
       const json = await response.json();
-      
-      // Proteksi jika pair likuiditas belum terindeks di DexScreener
-      if (!json.pairs || json.pairs.length === 0) {
-        throw new Error("No active pairs found on DexScreener node");
+      if (!json.pairs || json.pairs.length === 0) throw new Error("Target pool pair not found");
+
+      const primaryPair = json.pairs[0];
+
+      // Format Angka Desimal Presisi Tinggi
+      const usdPrice = parseFloat(primaryPair.priceUsd || 0);
+      const wethPrice = parseFloat(primaryPair.priceNative || 0);
+
+      const elPriceUsd = document.getElementById('mkt-price-usd');
+      const elPriceWeth = document.getElementById('mkt-price-weth');
+
+      if (elPriceUsd) elPriceUsd.textContent = usdPrice < 0.0001 ? `$${usdPrice.toFixed(8)}` : `$${usdPrice.toFixed(4)}`;
+      if (elPriceWeth) elPriceWeth.textContent = `${wethPrice.toFixed(8)} WETH`;
+
+      // Format Satuan Likuiditas & Kapitalisasi Pasar (K / M / B) seperti DexScreener Dashboard
+      const formatDexMetric = (value) => {
+        const num = parseFloat(value);
+        if (isNaN(num) || num === 0) return "$0";
+        if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
+        if (num >= 1000) return `$${(num / 1000).toFixed(0)}K`;
+        return `$${num.toFixed(0)}`;
+      };
+
+      const elLiquidity = document.getElementById('mkt-liquidity');
+      const elCap = document.getElementById('mkt-cap');
+      const elFdv = document.getElementById('mkt-fdv');
+
+      if (elLiquidity) elLiquidity.textContent = formatDexMetric(primaryPair.liquidity?.usd);
+      if (elCap) elCap.textContent = formatDexMetric(primaryPair.marketCap || primaryPair.fdv);
+      if (elFdv) elFdv.textContent = formatDexMetric(primaryPair.fdv);
+
+      // Sinkronisasi Indikator Matrix Perubahan Harga 5M, 1H, 6H, dan 24H
+      if (primaryPair.priceChange) {
+        updateIntervalUI('perf-5m', primaryPair.priceChange.m5);
+        updateIntervalUI('perf-1h', primaryPair.priceChange.h1);
+        updateIntervalUI('perf-6h', primaryPair.priceChange.h6);
+        updateIntervalUI('perf-24h', primaryPair.priceChange.h24);
       }
 
-      // Ambil objek pair utama (likuiditas tertinggi)
-      const primaryPair = json.pairs[0]; 
-
-      // Update Native Market Metrics DOM Fields
-      document.getElementById('mkt-price-usd').textContent = `$${parseFloat(primaryPair.priceUsd).toFixed(8)}`;
-      document.getElementById('mkt-price-weth').textContent = `${parseFloat(primaryPair.priceNative).toFixed(10)} WETH`;
-      document.getElementById('mkt-liquidity').textContent = `$${parseFloat(primaryPair.liquidity.usd).toLocaleString(undefined, {maximumFractionDigits:0})}`;
-      document.getElementById('mkt-cap').textContent = `$${parseFloat(primaryPair.marketCap || primaryPair.fdv).toLocaleString(undefined, {maximumFractionDigits:0})}`;
-      document.getElementById('mkt-fdv').textContent = `$${parseFloat(primaryPair.fdv).toLocaleString(undefined, {maximumFractionDigits:0})}`;
-
-      // Cascade Timeframe Interval Matrix Elements
-      updateIntervalUI('perf-5m', primaryPair.priceChange.m5);
-      updateIntervalUI('perf-1h', primaryPair.priceChange.h1);
-      updateIntervalUI('perf-24h', primaryPair.priceChange.h24);
-
-      console.log("Telemetry successfully synced with DexScreener Core Node.");
-
     } catch (err) {
-      console.warn("DexScreener Telemetry Warning:", err.message);
-      
-      // Fallback UI jika API DexScreener mengalami cooldown/limit
-      document.getElementById('mkt-price-usd').textContent = "$0.00 (Syncing)";
-      document.getElementById('mkt-price-weth').textContent = "0.00 WETH";
-      document.getElementById('mkt-liquidity').textContent = "$0.00";
-      document.getElementById('mkt-cap').textContent = "Awaiting Data";
-      document.getElementById('mkt-fdv').textContent = "Awaiting Data";
+      console.warn("DexScreener Core Node Engine Error:", err.message);
     }
   }
 
@@ -139,9 +149,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       const cleanDeadBalance = parseFloat(ethers.utils.formatUnits(rawDeadBalance, decimals));
       const burnPercentage = cleanTotalSupply > 0 ? (cleanDeadBalance / cleanTotalSupply) * 100 : 0;
 
-      furnaceTotalBurned.innerHTML = `${cleanDeadBalance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} <span class="ticker-suffix">${symbol}</span>`;
-      furnacePctBurned.textContent = `${burnPercentage.toFixed(4)}%`;
-      furnaceTimestamp.textContent = `Last Cryptographic Sync: ${new Date().toLocaleTimeString()} · Block #${runtimeBlock.toLocaleString()}`;
+      if (furnaceTotalBurned) {
+        furnaceTotalBurned.innerHTML = `${cleanDeadBalance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} <span class="ticker-suffix">${symbol}</span>`;
+      }
+      if (furnacePctBurned) furnacePctBurned.textContent = `${burnPercentage.toFixed(4)}%`;
+      if (furnaceTimestamp) furnaceTimestamp.textContent = `Last Cryptographic Sync: ${new Date().toLocaleTimeString()} · Block #${runtimeBlock.toLocaleString()}`;
 
       const compactTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       if (chartLabels.length > 7) { chartLabels.shift(); chartDataPoints.shift(); }
@@ -166,9 +178,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         headers: { "Accept": "application/json", "Content-Type": "application/json" }
       });
       
-      // Atomic verification request
       initialNetworkBlock = await provider.getBlockNumber();
-      
       tokenContract = new ethers.Contract(ROBINHOOD_CONFIG.tokenAddress, minERC20ABI, provider);
       
       try {
@@ -178,13 +188,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.warn("Fallback to default 18 decimals due to contract view constraints.");
       }
 
-      // Handshake Confirmed successfully
-      statusDot.style.backgroundColor = "var(--neon-green)";
+      if (statusDot) statusDot.style.backgroundColor = "var(--neon-green)";
       if (rpcStatus) {
         rpcStatus.textContent = "Connected";
         rpcStatus.className = "text-green";
       }
-      tickerText.textContent = `⚡ IMMUTABLE NODE SYNC ACTIVE · Tracking Robinhood Chain Block #${initialNetworkBlock.toLocaleString()}`;
+      if (tickerText) tickerText.textContent = `⚡ IMMUTABLE NODE SYNC ACTIVE · Tracking Robinhood Chain Block #${initialNetworkBlock.toLocaleString()}`;
       initialized = true;
       
     } catch (error) {
@@ -202,37 +211,40 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     try {
       const deadLogFilter = tokenContract.filters.Transfer(null, ROBINHOOD_CONFIG.burnAddress);
-      
-      // Safe, minimal block range scan to protect standard API rate limits
       const preloadedLogs = await tokenContract.queryFilter(deadLogFilter, initialNetworkBlock - 150, initialNetworkBlock);
-      if (preloadedLogs.length > 0) {
-        ledgerContainer.innerHTML = '';
-        preloadedLogs.reverse().slice(0, 5).forEach(log => appendLedgerRow(log, decimals, symbol));
-      } else {
-        ledgerContainer.innerHTML = `<div class="loading-text">No burn actions processed inside indexing window. Standing by...</div>`;
+      
+      if (ledgerContainer) {
+        if (preloadedLogs.length > 0) {
+          ledgerContainer.innerHTML = '';
+          preloadedLogs.reverse().slice(0, 5).forEach(log => appendLedgerRow(log, decimals, symbol));
+        } else {
+          ledgerContainer.innerHTML = `<div class="loading-text">No burn actions processed inside indexing window. Standing by...</div>`;
+        }
       }
 
       tokenContract.on(deadLogFilter, (from, to, value, event) => {
-        const loader = ledgerContainer.querySelector('.loading-text');
-        if (loader) ledgerContainer.innerHTML = '';
-        appendLedgerRow(event, decimals, symbol);
+        if (ledgerContainer) {
+          const loader = ledgerContainer.querySelector('.loading-text');
+          if (loader) ledgerContainer.innerHTML = '';
+          appendLedgerRow(event, decimals, symbol);
+        }
         queryOnChainState(); 
       });
     } catch(logErr) {
       console.warn("Real-time logging paused due to node RPC provider subscription limits.");
     }
   } else {
-    // Ultimate Fallback - Both nodes exhausted or blocked by local client configurations
-    tickerText.textContent = "❌ Node Call Failed. Critical RPC Connection Dropped. Verify Terminal Endpoint Status.";
+    if (tickerText) tickerText.textContent = "❌ Node Call Failed. Critical RPC Connection Dropped. Verify Terminal Endpoint Status.";
     if (rpcStatus) {
       rpcStatus.textContent = "Gateway Failure";
       rpcStatus.className = "text-red";
     }
-    statusDot.style.backgroundColor = "var(--neon-red)";
+    if (statusDot) statusDot.style.backgroundColor = "var(--neon-red)";
   }
 
   // Pure DOM Node Generation for Ledger System Rows
   function appendLedgerRow(event, decimals, symbol) {
+    if (!ledgerContainer) return;
     let quantity = 0;
     let senderAddress = "0x0000...0000";
     
