@@ -221,41 +221,48 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // RUNTIME LIFECYCLE ROUTER EXECUTION
   if (initialized) {
-    // Jalankan pipeline on-chain & pasar secara paralel (Non-blocking UI loader)
-    queryOnChainState();
-    fetchMarketTelemetry();
+    // 🔥 PERBAIKAN UTAMA: Jalankan request dasar secara paralel non-blocking
+    Promise.allSettled([
+      queryOnChainState(),
+      fetchMarketTelemetry()
+    ]).catch(err => console.warn("Initial payload load warning:", err));
 
     setInterval(queryOnChainState, 15000);
     setInterval(fetchMarketTelemetry, 30000);
 
-    // Pemisahan thread asinkron untuk scanning logs transaksi masa lalu
-    (async () => {
-      try {
-        const deadLogFilter = tokenContract.filters.Transfer(null, ROBINHOOD_CONFIG.burnAddress);
-        // Mengurangi pencarian dari 150 ke 50 blok untuk akselerasi respon IO data
-        const preloadedLogs = await tokenContract.queryFilter(deadLogFilter, initialNetworkBlock - 50, initialNetworkBlock);
-        
-        if (ledgerContainer) {
-          if (preloadedLogs.length > 0) {
-            ledgerContainer.innerHTML = '';
-            preloadedLogs.reverse().slice(0, 5).forEach(log => appendLedgerRow(log, decimals, symbol));
-          } else {
-            ledgerContainer.innerHTML = `<div class="loading-text">No burn actions processed inside indexing window. Standing by...</div>`;
+    // 🔥 ISOLASI TOTAL SCANNING LOG: Ditunda 600ms agar halaman terasa ringan & harga muncul duluan
+    setTimeout(() => {
+      (async () => {
+        try {
+          const deadLogFilter = tokenContract.filters.Transfer(null, ROBINHOOD_CONFIG.burnAddress);
+          // Mengurangi pencarian ke 20 blok terakhir untuk memangkas I/O bottleneck node RPC
+          const preloadedLogs = await tokenContract.queryFilter(deadLogFilter, initialNetworkBlock - 20, initialNetworkBlock);
+          
+          if (ledgerContainer) {
+            if (preloadedLogs && preloadedLogs.length > 0) {
+              ledgerContainer.innerHTML = '';
+              preloadedLogs.reverse().slice(0, 5).forEach(log => appendLedgerRow(log, decimals, symbol));
+            } else {
+              ledgerContainer.innerHTML = `<div class="loading-text">No burn actions processed inside indexing window. Standing by...</div>`;
+            }
+          }
+
+          tokenContract.on(deadLogFilter, (from, to, value, event) => {
+            if (ledgerContainer) {
+              const loader = ledgerContainer.querySelector('.loading-text');
+              if (loader) ledgerContainer.innerHTML = '';
+              appendLedgerRow(event, decimals, symbol);
+            }
+            queryOnChainState(); 
+          });
+        } catch(logErr) {
+          console.warn("Log tracking delayed or shifted by gateway traffic constraints.");
+          if (ledgerContainer) {
+            ledgerContainer.innerHTML = `<div class="loading-text" style="color:var(--text-muted);">Ledger histories temporarily offline (Node busy). Price indexing active...</div>`;
           }
         }
-
-        tokenContract.on(deadLogFilter, (from, to, value, event) => {
-          if (ledgerContainer) {
-            const loader = ledgerContainer.querySelector('.loading-text');
-            if (loader) ledgerContainer.innerHTML = '';
-            appendLedgerRow(event, decimals, symbol);
-          }
-          queryOnChainState(); 
-        });
-      } catch(logErr) {
-        console.warn("Real-time logging paused due to node RPC provider subscription limits.");
-      }
-    })();
+      })();
+    }, 600);
 
   } else {
     if (tickerText) tickerText.textContent = "❌ Node Call Failed. Critical RPC Connection Dropped. Verify Terminal Endpoint Status.";
