@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const CONFIG = {
     tokenAddress: "0x1acA7fBccbB9A79462a057cb11928c0d866aA3C4", // Verified Production CA
     burnAddress: "0x000000000000000000000000000000000000dEaD",
-    pairAddress: "0xf5329a8115ac7784b37d1a0d560b43b027270677", // Uniswap V3 Pool Pair OXID/WETH (Forced Lowercase)
+    pairAddress: "0x04C5A4470d72dCf80E306b983EA179f1eb0D4BbB", // Uniswap V3 Pool Pair OXID/WETH (Forced Lowercase)
     explorerApiUrl: "https://robinhoodchain.blockscout.com/api"  // Blockscout Core REST API Endpoints
   };
 
