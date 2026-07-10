@@ -16,6 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const caValue = document.getElementById('ca-value');
   const footerCaText = document.getElementById('footer-ca-text');
   const btnBuy = document.getElementById('btn-buy');
+  const btnTwitter = document.getElementById('btn-twitter');
+  const btnTelegram = document.getElementById('btn-telegram');
   const tickerText = document.getElementById('live-ticker-text');
   const rpcStatus = document.getElementById('rpc-status');
   const statusDot = document.getElementById('status-dot');
@@ -28,6 +30,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if (caValue) caValue.textContent = `${CONFIG.tokenAddress.slice(0, 6)}...${CONFIG.tokenAddress.slice(-4)}`;
   if (footerCaText) footerCaText.textContent = CONFIG.tokenAddress;
   if (btnBuy) btnBuy.setAttribute('href', `https://fun.noxa.fi/robinhood/token/${CONFIG.tokenAddress}`);
+  if (btnTwitter)
+    btnTwitter.href = CONFIG.social.twitter;
+
+  if (btnTelegram)
+    btnTelegram.href = CONFIG.social.telegram;
 
   let burnChartInstance = null;
   let chartLabels = [];
