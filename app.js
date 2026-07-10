@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Hard UI Hydration
   caValue.textContent = `${ROBINHOOD_CONFIG.tokenAddress.slice(0, 6)}...${ROBINHOOD_CONFIG.tokenAddress.slice(-4)}`;
   footerCaText.textContent = ROBINHOOD_CONFIG.tokenAddress;
-  btnBuy.setAttribute('href', `https://robinhoodchain.blockscout.com/token/${ROBINHOOD_CONFIG.tokenAddress}`);
+  btnBuy.setAttribute('href', `https://fun.noxa.fi/robinhood/token/${ROBINHOOD_CONFIG.tokenAddress}`);
 
   let burnChartInstance = null;
   let chartLabels = [];
