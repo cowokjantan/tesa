@@ -1,24 +1,12 @@
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
 
-  // CRITICAL PRODUCTION ROBINHOOD CHAIN HARDWARE CONFIGURATION
-  const ROBINHOOD_CONFIG = {
-    rpcUrls: [
-      "https://rpc.mainnet.chain.robinhood.com/",
-      "https://rpc.robinhoodchain.com"
-    ],
+  // PRODUCTION HARDWARE CONFIGURATION (HYBRID INDEXER ARCHITECTURE)
+  const CONFIG = {
     tokenAddress: "0x0c978fcf859782619556201919ba8f946db5ba75", // Verified Production CA
     burnAddress: "0x000000000000000000000000000000000000dEaD",
-    // Pool Pair Address Uniswap V3 untuk OXID/WETH di Robinhood Chain (Bypass standard token cache)
-    pairAddress: "0xF5329A8115Ac7784b37d1A0D560b43B027270677" 
+    pairAddress: "0xF5329A8115Ac7784b37d1A0D560b43B027270677", // Uniswap V3 Pool Pair OXID/WETH
+    explorerApiUrl: "https://robinhoodchain.blockscout.com/api"  // Blockscout Core REST API Endpoints
   };
-
-  const minERC20ABI = [
-    "function totalSupply() view returns (uint256)",
-    "function balanceOf(address) view returns (uint256)",
-    "function symbol() view returns (string)",
-    "function decimals() view returns (uint8)",
-    "event Transfer(address indexed from, address indexed to, uint256 value)"
-  ];
 
   // DOM Elements Caching Strategy
   const caValue = document.getElementById('ca-value');
@@ -32,19 +20,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   const furnaceTimestamp = document.getElementById('furnace-timestamp');
   const ledgerContainer = document.getElementById('ledger-container');
 
-  // Hard UI Hydration
-  if (caValue) caValue.textContent = `${ROBINHOOD_CONFIG.tokenAddress.slice(0, 6)}...${ROBINHOOD_CONFIG.tokenAddress.slice(-4)}`;
-  if (footerCaText) footerCaText.textContent = ROBINHOOD_CONFIG.tokenAddress;
-  if (btnBuy) btnBuy.setAttribute('href', `https://fun.noxa.fi/robinhood/token/${ROBINHOOD_CONFIG.tokenAddress}`);
+  // Hard UI Hydration (Instantly Loaded)
+  if (caValue) caValue.textContent = `${CONFIG.tokenAddress.slice(0, 6)}...${CONFIG.tokenAddress.slice(-4)}`;
+  if (footerCaText) footerCaText.textContent = CONFIG.tokenAddress;
+  if (btnBuy) btnBuy.setAttribute('href', `https://fun.noxa.fi/robinhood/token/${CONFIG.tokenAddress}`);
 
   let burnChartInstance = null;
   let chartLabels = [];
   let chartDataPoints = [];
-  let provider = null;
-  let tokenContract = null;
-  let decimals = 18;
-  let symbol = "OXID";
-  let initialNetworkBlock = 0;
+  const decimals = 18;
+  const symbol = "OXID";
 
   // HELPER ENGINE: Mengubah angka desimal mikro menjadi format subskrip (Contoh: 0.0₄5230)
   function formatMicroPrice(value) {
@@ -99,17 +84,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // 1. DYNAMIC PAIR-BASED DEXSCREENER ENGINE INTERACTION
+  // 1. DYNAMIC PAIR-BASED DEXSCREENER TELEMETRY (TOTAL ISOLATED - INSTANT LOADING)
   async function fetchMarketTelemetry() {
     try {
-      const response = await fetch(`https://api.dexscreener.com/latest/dex/pairs/robinhood-chain/${ROBINHOOD_CONFIG.pairAddress}`);
-      if (!response.ok) throw new Error("DexScreener API limits hit or indexer offline");
+      const response = await fetch(`https://api.dexscreener.com/latest/dex/pairs/robinhood-chain/${CONFIG.pairAddress}`);
+      if (!response.ok) throw new Error("DexScreener API limits hit");
 
       const json = await response.json();
       if (!json.pairs || json.pairs.length === 0) throw new Error("Target pool pair not found");
 
       const primaryPair = json.pairs[0];
-
       const elPriceUsd = document.getElementById('mkt-price-usd');
       const elPriceWeth = document.getElementById('mkt-price-weth');
 
@@ -143,7 +127,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
     } catch (err) {
-      console.warn("DexScreener Core Node Engine Error:", err.message);
+      console.warn("DexScreener Telemetry Interruption:", err.message);
     }
   }
 
@@ -155,23 +139,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     element.className = `percentage ${numericValue >= 0 ? 'text-green' : 'text-red'}`;
   }
 
-  // 2. CORE QUERY IMPLEMENTATION
-  async function queryOnChainState() {
-    if (!tokenContract || !provider) return;
+  // 2. HIGH-SPEED STATE QUERY VIA BLOCKSCOUT REST CORE API (Replaces Legacy RPC Calls)
+  async function queryOnChainStateByAPI() {
     try {
-      const runtimeBlock = await provider.getBlockNumber();
-      const rawTotalSupply = await tokenContract.totalSupply();
-      const rawDeadBalance = await tokenContract.balanceOf(ROBINHOOD_CONFIG.burnAddress);
+      // Mengambil data total supply token dan saldo alamat burn secara paralel via database indexer
+      const [supplyRes, burnRes] = await Promise.all([
+        fetch(`${CONFIG.explorerApiUrl}?module=token&action=gettoken&contractaddress=${CONFIG.tokenAddress}`),
+        fetch(`${CONFIG.explorerApiUrl}?module=account&action=tokenbalance&contractaddress=${CONFIG.tokenAddress}&address=${CONFIG.burnAddress}`)
+      ]);
 
-      const cleanTotalSupply = parseFloat(ethers.utils.formatUnits(rawTotalSupply, decimals));
-      const cleanDeadBalance = parseFloat(ethers.utils.formatUnits(rawDeadBalance, decimals));
+      if (!supplyRes.ok || !burnRes.ok) throw new Error("Blockscout Indexer Gateway busy");
+
+      const supplyData = await supplyRes.json();
+      const burnData = await burnRes.json();
+
+      const rawTotalSupply = supplyData.result?.totalSupply || "100000000000000000000000000"; 
+      const rawDeadBalance = burnData.result || "0";
+
+      const cleanTotalSupply = parseFloat(rawTotalSupply) / Math.pow(10, decimals);
+      const cleanDeadBalance = parseFloat(rawDeadBalance) / Math.pow(10, decimals);
       const burnPercentage = cleanTotalSupply > 0 ? (cleanDeadBalance / cleanTotalSupply) * 100 : 0;
 
       if (furnaceTotalBurned) {
         furnaceTotalBurned.innerHTML = `${cleanDeadBalance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} <span class="ticker-suffix">${symbol}</span>`;
       }
       if (furnacePctBurned) furnacePctBurned.textContent = `${burnPercentage.toFixed(4)}%`;
-      if (furnaceTimestamp) furnaceTimestamp.textContent = `Last Cryptographic Sync: ${new Date().toLocaleTimeString()} · Block #${runtimeBlock.toLocaleString()}`;
+      if (furnaceTimestamp) furnaceTimestamp.textContent = `Last Indexer Sync: ${new Date().toLocaleTimeString()} · Data via Blockscout Core API`;
 
       const compactTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       if (chartLabels.length > 7) { chartLabels.shift(); chartDataPoints.shift(); }
@@ -181,132 +174,74 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!burnChartInstance) initChart();
       else burnChartInstance.update();
 
-    } catch (e) {
-      console.error("RPC state fetch encounter:", e);
-    }
-  }
-
-  // 3. CRYPTOGRAPHIC SECURE ON-CHAIN BLOCKCHAIN READ PIPELINE WITH AUTONOMOUS FALLBACKS
-  let initialized = false;
-  for (let rpcTarget of ROBINHOOD_CONFIG.rpcUrls) {
-    if (initialized) break;
-    try {
-      provider = new ethers.providers.JsonRpcProvider({
-        url: rpcTarget,
-        headers: { "Accept": "application/json", "Content-Type": "application/json" }
-      });
-      
-      initialNetworkBlock = await provider.getBlockNumber();
-      tokenContract = new ethers.Contract(ROBINHOOD_CONFIG.tokenAddress, minERC20ABI, provider);
-      
-      try {
-        decimals = await tokenContract.decimals();
-        symbol = await tokenContract.symbol();
-      } catch (tokenErr) {
-        console.warn("Fallback to default 18 decimals due to contract view constraints.");
-      }
-
       if (statusDot) statusDot.style.backgroundColor = "var(--neon-green)";
       if (rpcStatus) {
-        rpcStatus.textContent = "Connected";
+        rpcStatus.textContent = "Indexer Synced";
         rpcStatus.className = "text-green";
       }
-      if (tickerText) tickerText.textContent = `⚡ IMMUTABLE NODE SYNC ACTIVE · Tracking Robinhood Chain Block #${initialNetworkBlock.toLocaleString()}`;
-      initialized = true;
+      if (tickerText) tickerText.textContent = `⚡ HIGH-SPEED INDEXING SYSTEM ACTIVE · Telemetry synced via Blockscout Endpoint`;
+
+    } catch (e) {
+      console.error("Blockscout State Bridge Error:", e);
+      if (rpcStatus) {
+        rpcStatus.textContent = "Indexer Lag";
+        rpcStatus.className = "text-red";
+      }
+      if (statusDot) statusDot.style.backgroundColor = "var(--neon-red)";
+    }
+  }
+
+  // 3. RETRIEVE HISTORICAL BURN LEDGER FROM BLOCKSCOUT CORE LOGS
+  async function fetchLedgerHistoryByAPI() {
+    try {
+      const response = await fetch(`${CONFIG.explorerApiUrl}?module=account&action=tokentx&contractaddress=${CONFIG.tokenAddress}&address=${CONFIG.burnAddress}&page=1&offset=10&sort=desc`);
+      if (!response.ok) return;
+      const json = await response.json();
       
-    } catch (error) {
-      console.error(`RPC Handshake rejected by host gateway: ${rpcTarget}`, error);
-    }
-  }
-
-  // RUNTIME LIFECYCLE ROUTER EXECUTION
-  if (initialized) {
-    // 🔥 PERBAIKAN UTAMA: Jalankan request dasar secara paralel non-blocking
-    Promise.allSettled([
-      queryOnChainState(),
-      fetchMarketTelemetry()
-    ]).catch(err => console.warn("Initial payload load warning:", err));
-
-    setInterval(queryOnChainState, 15000);
-    setInterval(fetchMarketTelemetry, 30000);
-
-    // 🔥 ISOLASI TOTAL SCANNING LOG: Ditunda 600ms agar halaman terasa ringan & harga muncul duluan
-    setTimeout(() => {
-      (async () => {
-        try {
-          const deadLogFilter = tokenContract.filters.Transfer(null, ROBINHOOD_CONFIG.burnAddress);
-          // Mengurangi pencarian ke 20 blok terakhir untuk memangkas I/O bottleneck node RPC
-          const preloadedLogs = await tokenContract.queryFilter(deadLogFilter, initialNetworkBlock - 20, initialNetworkBlock);
-          
-          if (ledgerContainer) {
-            if (preloadedLogs && preloadedLogs.length > 0) {
-              ledgerContainer.innerHTML = '';
-              preloadedLogs.reverse().slice(0, 5).forEach(log => appendLedgerRow(log, decimals, symbol));
-            } else {
-              ledgerContainer.innerHTML = `<div class="loading-text">No burn actions processed inside indexing window. Standing by...</div>`;
-            }
-          }
-
-          tokenContract.on(deadLogFilter, (from, to, value, event) => {
-            if (ledgerContainer) {
-              const loader = ledgerContainer.querySelector('.loading-text');
-              if (loader) ledgerContainer.innerHTML = '';
-              appendLedgerRow(event, decimals, symbol);
-            }
-            queryOnChainState(); 
+      if (ledgerContainer && json.result && Array.isArray(json.result)) {
+        // Filter transaksi untuk memastikan arah dana masuk ke Burn Address (Melted)
+        const burnLogs = json.result.filter(tx => tx.to.toLowerCase() === CONFIG.burnAddress.toLowerCase());
+        
+        if (burnLogs.length > 0) {
+          ledgerContainer.innerHTML = '';
+          burnLogs.slice(0, 5).forEach(tx => {
+            const quantity = parseFloat(tx.value) / Math.pow(10, decimals);
+            const compactHash = `${tx.hash.slice(0, 6)}...${tx.hash.slice(-4)}`;
+            
+            const row = document.createElement('div');
+            row.className = 'ledger-row';
+            row.innerHTML = `
+              <div class="ledger-meta">
+                <span>Block #${tx.blockNumber} · Transaction: <a href="https://robinhoodchain.blockscout.com/tx/${tx.hash}" target="_blank" style="color:var(--brand-orange); text-decoration:none;">${compactHash} ↗</a></span>
+                <span class="ledger-status">✓ On-Chain Verified Ledger</span>
+              </div>
+              <div class="ledger-data">
+                <div class="ledger-step"><span class="l">Sender Origin</span><div class="v" style="color:var(--text-muted); font-size:11px;">${tx.from.slice(0,8)}...${tx.from.slice(-4)}</div></div>
+                <div class="ledger-step"><span class="l">Amount Melted</span><div class="v text-green">${quantity.toLocaleString()} ${symbol}</div></div>
+              </div>
+            `;
+            ledgerContainer.appendChild(row);
           });
-        } catch(logErr) {
-          console.warn("Log tracking delayed or shifted by gateway traffic constraints.");
-          if (ledgerContainer) {
-            ledgerContainer.innerHTML = `<div class="loading-text" style="color:var(--text-muted);">Ledger histories temporarily offline (Node busy). Price indexing active...</div>`;
-          }
+        } else {
+          ledgerContainer.innerHTML = `<div class="loading-text">No burn actions inside indexing window. Standing by...</div>`;
         }
-      })();
-    }, 600);
-
-  } else {
-    if (tickerText) tickerText.textContent = "❌ Node Call Failed. Critical RPC Connection Dropped. Verify Terminal Endpoint Status.";
-    if (rpcStatus) {
-      rpcStatus.textContent = "Gateway Failure";
-      rpcStatus.className = "text-red";
-    }
-    if (statusDot) statusDot.style.backgroundColor = "var(--neon-red)";
-  }
-
-  // Pure DOM Node Generation for Ledger System Rows
-  function appendLedgerRow(event, decimals, symbol) {
-    if (!ledgerContainer) return;
-    let quantity = 0;
-    let senderAddress = "0x0000...0000";
-    
-    if (event.args && event.args.value) {
-      quantity = parseFloat(ethers.utils.formatUnits(event.args.value, decimals));
-      senderAddress = event.args.from;
-    }
-    
-    const compactHash = `${event.transactionHash.slice(0, 6)}...${event.transactionHash.slice(-4)}`;
-    const row = document.createElement('div');
-    row.className = 'ledger-row';
-    row.innerHTML = `
-      <div class="ledger-meta">
-        <span>Block #${event.blockNumber} · Transaction: <a href="https://robinhoodchain.blockscout.com/tx/${event.transactionHash}" target="_blank" style="color:var(--brand-orange); text-decoration:none;">${compactHash} ↗</a></span>
-        <span class="ledger-status">✓ On-Chain Immutably Signed</span>
-      </div>
-      <div class="ledger-data">
-        <div class="ledger-step"><span class="l">Sender Origin</span><div class="v" style="color:var(--text-muted); font-size:11px;">${senderAddress.slice(0,8)}...${senderAddress.slice(-4)}</div></div>
-        <div class="ledger-step"><span class="l">Amount Melted</span><div class="v text-green">${quantity.toLocaleString()} ${symbol}</div></div>
-      </div>
-    `;
-
-    if (ledgerContainer.firstChild && !ledgerContainer.querySelector('.loading-text')) {
-      ledgerContainer.insertBefore(row, ledgerContainer.firstChild);
-    } else {
-      ledgerContainer.appendChild(row);
-    }
-
-    const activeRows = ledgerContainer.querySelectorAll('.ledger-row');
-    if (activeRows.length > 5) {
-      ledgerContainer.removeChild(activeRows[activeRows.length - 1]);
+      }
+    } catch (err) {
+      console.warn("Ledger indexing anomaly:", err);
+      if (ledgerContainer) {
+        ledgerContainer.innerHTML = `<div class="loading-text" style="color:var(--text-muted);">Ledger temporarily offline. Market metrics still active.</div>`;
+      }
     }
   }
+
+  // RUNTIME INITIAL PIPELINE ROUTER EXECUTION
+  // Eksekusi secara paralel murni tanpa ada proses synchronous yang memblokir satu sama lain
+  fetchMarketTelemetry();
+  queryOnChainStateByAPI();
+  fetchLedgerHistoryByAPI();
+
+  // SECURE LIFECYCLE TIMING POLLING SYSTEM (Mencegah I/O Bloking & Memory Leaks)
+  setInterval(fetchMarketTelemetry, 15000);   // Refresh metrik harga DexScreener tiap 15 detik
+  setInterval(queryOnChainStateByAPI, 30000);  // Refresh akumulasi supply & chart tiap 30 detik
+  setInterval(fetchLedgerHistoryByAPI, 30000); // Polling mutasi transaksi baru tiap 30 detik
 });
