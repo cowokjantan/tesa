@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const CONFIG = {
     tokenAddress: "0x0c978fcf859782619556201919ba8f946db5ba75", // Verified Production CA
     burnAddress: "0x000000000000000000000000000000000000dEaD",
-    pairAddress: "0xF5329A8115Ac7784b37d1A0D560b43B027270677", // Uniswap V3 Pool Pair OXID/WETH
+    pairAddress: "0xf5329a8115ac7784b37d1a0d560b43b027270677", // Uniswap V3 Pool Pair OXID/WETH (Forced Lowercase)
     explorerApiUrl: "https://robinhoodchain.blockscout.com/api"  // Blockscout Core REST API Endpoints
   };
 
@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return `$${num.toFixed(8)}`;
   }
 
-  // CHART ENGINE INITIALIZATION (Strict Cumulative Linear Pathing)
+  // CHART ENGINE INITIALIZATION
   function initChart() {
     const el = document.getElementById('oxideBurnChart');
     if (!el) return;
@@ -84,10 +84,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 1. DYNAMIC PAIR-BASED DEXSCREENER TELEMETRY (TOTAL ISOLATED - INSTANT LOADING)
+  // 1. DYNAMIC PAIR-BASED DEXSCREENER TELEMETRY (FIXED TO ROBINHOOD ROUTE)
   async function fetchMarketTelemetry() {
     try {
-      const response = await fetch(`https://api.dexscreener.com/latest/dex/pairs/robinhood-chain/${CONFIG.pairAddress}`);
+      // PERBAIKAN: Mengubah sub-domain dari 'robinhood-chain' ke 'robinhood' sesuai basis data indeks DexScreener
+      const response = await fetch(`https://api.dexscreener.com/latest/dex/pairs/robinhood/${CONFIG.pairAddress.toLowerCase()}`);
       if (!response.ok) throw new Error("DexScreener API limits hit");
 
       const json = await response.json();
@@ -97,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const elPriceUsd = document.getElementById('mkt-price-usd');
       const elPriceWeth = document.getElementById('mkt-price-weth');
 
-      if (elPriceUsd) elPriceUsd.textContent = formatMicroPrice(primaryPair.priceUsd);
+      if (elPriceUsd && primaryPair.priceUsd) elPriceUsd.textContent = formatMicroPrice(primaryPair.priceUsd);
       if (elPriceWeth) {
         const wethPrice = parseFloat(primaryPair.priceNative || 0);
         elPriceWeth.textContent = wethPrice < 0.0001 ? `${wethPrice.toFixed(10)} WETH` : `${wethPrice.toFixed(6)} WETH`;
@@ -139,10 +140,10 @@ document.addEventListener('DOMContentLoaded', () => {
     element.className = `percentage ${numericValue >= 0 ? 'text-green' : 'text-red'}`;
   }
 
-  // 2. HIGH-SPEED STATE QUERY VIA BLOCKSCOUT REST CORE API (Replaces Legacy RPC Calls)
+  // 2. HIGH-SPEED STATE QUERY VIA BLOCKSCOUT REST CORE API
   async function queryOnChainStateByAPI() {
     try {
-      // Mengambil data total supply token dan saldo alamat burn secara paralel via database indexer
+      // PERBAIKAN: Parameter disesuaikan murni dengan REST specification standar Blockscout Core API
       const [supplyRes, burnRes] = await Promise.all([
         fetch(`${CONFIG.explorerApiUrl}?module=token&action=gettoken&contractaddress=${CONFIG.tokenAddress}`),
         fetch(`${CONFIG.explorerApiUrl}?module=account&action=tokenbalance&contractaddress=${CONFIG.tokenAddress}&address=${CONFIG.burnAddress}`)
@@ -194,12 +195,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // 3. RETRIEVE HISTORICAL BURN LEDGER FROM BLOCKSCOUT CORE LOGS
   async function fetchLedgerHistoryByAPI() {
     try {
-      const response = await fetch(`${CONFIG.explorerApiUrl}?module=account&action=tokentx&contractaddress=${CONFIG.tokenAddress}&address=${CONFIG.burnAddress}&page=1&offset=10&sort=desc`);
+      const response = await fetch(`${CONFIG.explorerApiUrl}?module=account&action=tokentx&contractaddress=${CONFIG.tokenAddress}&address=${CONFIG.burnAddress}&page=1&offset=15&sort=desc`);
       if (!response.ok) return;
       const json = await response.json();
       
       if (ledgerContainer && json.result && Array.isArray(json.result)) {
-        // Filter transaksi untuk memastikan arah dana masuk ke Burn Address (Melted)
         const burnLogs = json.result.filter(tx => tx.to.toLowerCase() === CONFIG.burnAddress.toLowerCase());
         
         if (burnLogs.length > 0) {
@@ -235,13 +235,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // RUNTIME INITIAL PIPELINE ROUTER EXECUTION
-  // Eksekusi secara paralel murni tanpa ada proses synchronous yang memblokir satu sama lain
   fetchMarketTelemetry();
   queryOnChainStateByAPI();
   fetchLedgerHistoryByAPI();
 
-  // SECURE LIFECYCLE TIMING POLLING SYSTEM (Mencegah I/O Bloking & Memory Leaks)
-  setInterval(fetchMarketTelemetry, 15000);   // Refresh metrik harga DexScreener tiap 15 detik
-  setInterval(queryOnChainStateByAPI, 30000);  // Refresh akumulasi supply & chart tiap 30 detik
-  setInterval(fetchLedgerHistoryByAPI, 30000); // Polling mutasi transaksi baru tiap 30 detik
+  // SECURE LIFECYCLE TIMING POLLING SYSTEM
+  setInterval(fetchMarketTelemetry, 15000);   
+  setInterval(queryOnChainStateByAPI, 30000);  
+  setInterval(fetchLedgerHistoryByAPI, 30000); 
 });
