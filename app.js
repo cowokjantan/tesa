@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // PRODUCTION HARDWARE CONFIGURATION (HYBRID INDEXER ARCHITECTURE)
   const CONFIG = {
-    tokenAddress: "0x0c978fcf859782619556201919ba8f946db5ba75", // Verified Production CA
+    tokenAddress: "0x1acA7fBccbB9A79462a057cb11928c0d866aA3C4", // Verified Production CA
     burnAddress: "0x000000000000000000000000000000000000dEaD",
     pairAddress: "0xf5329a8115ac7784b37d1a0d560b43b027270677", // Uniswap V3 Pool Pair OXID/WETH (Forced Lowercase)
     explorerApiUrl: "https://robinhoodchain.blockscout.com/api"  // Blockscout Core REST API Endpoints
