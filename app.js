@@ -25,7 +25,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (footerCaText) footerCaText.textContent = CONFIG.tokenAddress;
   if (btnBuy) btnBuy.setAttribute('href', `https://fun.noxa.fi/robinhood/token/${CONFIG.tokenAddress}`);
 
-  // --- INTEGRASI SOSIAL MEDIA (COMING SOON) ---
+  // SOCIAL MEDIA INTERCEPTOR (INTEGRATED)
+  // Menangani klik pada elemen dengan class 'social-btn'
   const socialBtns = document.querySelectorAll('.social-btn');
   socialBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -33,7 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
       alert("Community channels (Telegram/Twitter) are coming soon. Stay tuned!");
     });
   });
-  // ---------------------------------------------
 
   let burnChartInstance = null;
   let chartLabels = [];
@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
     element.className = `percentage ${numericValue >= 0 ? 'text-green' : 'text-red'}`;
   }
 
-  // 2. HIGH-SPEED STATE QUERY VIA BLOCKSCOUT
+  // 2. HIGH-SPEED STATE QUERY VIA BLOCKSCOUT REST CORE API
   async function queryOnChainStateByAPI() {
     try {
       const [supplyRes, burnRes] = await Promise.all([
@@ -187,6 +187,8 @@ document.addEventListener('DOMContentLoaded', () => {
         rpcStatus.textContent = "Indexer Synced";
         rpcStatus.className = "text-green";
       }
+      if (tickerText) tickerText.textContent = `⚡ HIGH-SPEED INDEXING SYSTEM ACTIVE · Telemetry synced via Blockscout Endpoint`;
+
     } catch (e) {
       console.error("Blockscout State Bridge Error:", e);
       if (rpcStatus) {
@@ -197,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // 3. RETRIEVE HISTORICAL BURN LEDGER
+  // 3. RETRIEVE HISTORICAL BURN LEDGER FROM BLOCKSCOUT CORE LOGS
   async function fetchLedgerHistoryByAPI() {
     try {
       const response = await fetch(`${CONFIG.explorerApiUrl}?module=account&action=tokentx&contractaddress=${CONFIG.tokenAddress}&address=${CONFIG.burnAddress}&page=1&offset=15&sort=desc`);
@@ -227,19 +229,25 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             ledgerContainer.appendChild(row);
           });
+        } else {
+          ledgerContainer.innerHTML = `<div class="loading-text">No burn actions inside indexing window. Standing by...</div>`;
         }
       }
     } catch (err) {
       console.warn("Ledger indexing anomaly:", err);
+      if (ledgerContainer) {
+        ledgerContainer.innerHTML = `<div class="loading-text" style="color:var(--text-muted);">Ledger temporarily offline. Market metrics still active.</div>`;
+      }
     }
   }
 
-  // RUNTIME INITIAL PIPELINE
+  // RUNTIME INITIAL PIPELINE ROUTER EXECUTION
   fetchMarketTelemetry();
   queryOnChainStateByAPI();
   fetchLedgerHistoryByAPI();
 
-  setInterval(fetchMarketTelemetry, 15000);
-  setInterval(queryOnChainStateByAPI, 30000);
-  setInterval(fetchLedgerHistoryByAPI, 30000);
+  // SECURE LIFECYCLE TIMING POLLING SYSTEM
+  setInterval(fetchMarketTelemetry, 15000);   
+  setInterval(queryOnChainStateByAPI, 30000);  
+  setInterval(fetchLedgerHistoryByAPI, 30000); 
 });
