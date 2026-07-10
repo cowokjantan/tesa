@@ -52,13 +52,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (isNaN(num) || num === 0) return "$0.00";
     if (num >= 0.0001) return `$${num.toFixed(4)}`;
 
-    // Ubah ke string notasi ilmiah untuk mendeteksi jumlah angka nol
     const str = num.toFixed(20); 
     const match = str.match(/^0\.(0+)([1-9]\d*)$/);
     
     if (match) {
       const zeroCount = match[1].length;
-      const significantDigits = match[2].slice(0, 4); // Ambil 4 angka penting di belakangnya
+      const significantDigits = match[2].slice(0, 4);
       const subscriptMap = {
         '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄',
         '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉'
@@ -111,7 +110,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const primaryPair = json.pairs[0];
 
-      // Formatter UI untuk Harga Menggunakan Subskrip Desimal Mikro
       const elPriceUsd = document.getElementById('mkt-price-usd');
       const elPriceWeth = document.getElementById('mkt-price-weth');
 
@@ -121,7 +119,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         elPriceWeth.textContent = wethPrice < 0.0001 ? `${wethPrice.toFixed(10)} WETH` : `${wethPrice.toFixed(6)} WETH`;
       }
 
-      // Format Satuan K / M / B untuk Likuiditas & Kapitalisasi Pasar
       const formatDexMetric = (value) => {
         const num = parseFloat(value);
         if (isNaN(num) || num === 0) return "$0";
@@ -138,7 +135,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (elCap) elCap.textContent = formatDexMetric(primaryPair.marketCap || primaryPair.fdv);
       if (elFdv) elFdv.textContent = formatDexMetric(primaryPair.fdv);
 
-      // Sinkronisasi Indikator Matrix Perubahan Harga 5M, 1H, 6H, dan 24H
       if (primaryPair.priceChange) {
         updateIntervalUI('perf-5m', primaryPair.priceChange.m5);
         updateIntervalUI('perf-1h', primaryPair.priceChange.h1);
@@ -225,36 +221,42 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // RUNTIME LIFECYCLE ROUTER EXECUTION
   if (initialized) {
-    await queryOnChainState();
-    await fetchMarketTelemetry();
+    // Jalankan pipeline on-chain & pasar secara paralel (Non-blocking UI loader)
+    queryOnChainState();
+    fetchMarketTelemetry();
 
     setInterval(queryOnChainState, 15000);
     setInterval(fetchMarketTelemetry, 30000);
 
-    try {
-      const deadLogFilter = tokenContract.filters.Transfer(null, ROBINHOOD_CONFIG.burnAddress);
-      const preloadedLogs = await tokenContract.queryFilter(deadLogFilter, initialNetworkBlock - 150, initialNetworkBlock);
-      
-      if (ledgerContainer) {
-        if (preloadedLogs.length > 0) {
-          ledgerContainer.innerHTML = '';
-          preloadedLogs.reverse().slice(0, 5).forEach(log => appendLedgerRow(log, decimals, symbol));
-        } else {
-          ledgerContainer.innerHTML = `<div class="loading-text">No burn actions processed inside indexing window. Standing by...</div>`;
-        }
-      }
-
-      tokenContract.on(deadLogFilter, (from, to, value, event) => {
+    // Pemisahan thread asinkron untuk scanning logs transaksi masa lalu
+    (async () => {
+      try {
+        const deadLogFilter = tokenContract.filters.Transfer(null, ROBINHOOD_CONFIG.burnAddress);
+        // Mengurangi pencarian dari 150 ke 50 blok untuk akselerasi respon IO data
+        const preloadedLogs = await tokenContract.queryFilter(deadLogFilter, initialNetworkBlock - 50, initialNetworkBlock);
+        
         if (ledgerContainer) {
-          const loader = ledgerContainer.querySelector('.loading-text');
-          if (loader) ledgerContainer.innerHTML = '';
-          appendLedgerRow(event, decimals, symbol);
+          if (preloadedLogs.length > 0) {
+            ledgerContainer.innerHTML = '';
+            preloadedLogs.reverse().slice(0, 5).forEach(log => appendLedgerRow(log, decimals, symbol));
+          } else {
+            ledgerContainer.innerHTML = `<div class="loading-text">No burn actions processed inside indexing window. Standing by...</div>`;
+          }
         }
-        queryOnChainState(); 
-      });
-    } catch(logErr) {
-      console.warn("Real-time logging paused due to node RPC provider subscription limits.");
-    }
+
+        tokenContract.on(deadLogFilter, (from, to, value, event) => {
+          if (ledgerContainer) {
+            const loader = ledgerContainer.querySelector('.loading-text');
+            if (loader) ledgerContainer.innerHTML = '';
+            appendLedgerRow(event, decimals, symbol);
+          }
+          queryOnChainState(); 
+        });
+      } catch(logErr) {
+        console.warn("Real-time logging paused due to node RPC provider subscription limits.");
+      }
+    })();
+
   } else {
     if (tickerText) tickerText.textContent = "❌ Node Call Failed. Critical RPC Connection Dropped. Verify Terminal Endpoint Status.";
     if (rpcStatus) {
