@@ -126,3 +126,47 @@ body {
 .text-green { color: var(--neon-green) !important; }
 .text-red { color: var(--neon-red) !important; }
 .mono { font-family: var(--font-mono); }
+
+/* SOCIAL LINKS */
+
+.social-links{
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+
+.social-btn{
+    width:40px;
+    height:40px;
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+
+    background:var(--bg-card);
+
+    border:1px solid var(--border-subtle);
+    border-radius:6px;
+
+    color:var(--text-muted);
+
+    transition:.2s;
+}
+
+.social-btn svg{
+    width:18px;
+    height:18px;
+}
+
+.social-btn:hover{
+
+    color:white;
+
+    border-color:var(--brand-orange);
+
+    background:rgba(255,69,0,.08);
+
+    box-shadow:0 0 12px rgba(255,69,0,.35);
+
+    transform:translateY(-2px);
+}
