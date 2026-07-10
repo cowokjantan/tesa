@@ -25,6 +25,16 @@ document.addEventListener('DOMContentLoaded', () => {
   if (footerCaText) footerCaText.textContent = CONFIG.tokenAddress;
   if (btnBuy) btnBuy.setAttribute('href', `https://fun.noxa.fi/robinhood/token/${CONFIG.tokenAddress}`);
 
+  // --- INTEGRASI SOSIAL MEDIA (COMING SOON) ---
+  const socialBtns = document.querySelectorAll('.social-btn');
+  socialBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      alert("Community channels (Telegram/Twitter) are coming soon. Stay tuned!");
+    });
+  });
+  // ---------------------------------------------
+
   let burnChartInstance = null;
   let chartLabels = [];
   let chartDataPoints = [];
@@ -84,10 +94,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 1. DYNAMIC PAIR-BASED DEXSCREENER TELEMETRY (FIXED TO ROBINHOOD ROUTE)
+  // 1. DYNAMIC PAIR-BASED DEXSCREENER TELEMETRY
   async function fetchMarketTelemetry() {
     try {
-      // PERBAIKAN: Mengubah sub-domain dari 'robinhood-chain' ke 'robinhood' sesuai basis data indeks DexScreener
       const response = await fetch(`https://api.dexscreener.com/latest/dex/pairs/robinhood/${CONFIG.pairAddress.toLowerCase()}`);
       if (!response.ok) throw new Error("DexScreener API limits hit");
 
@@ -126,7 +135,6 @@ document.addEventListener('DOMContentLoaded', () => {
         updateIntervalUI('perf-6h', primaryPair.priceChange.h6);
         updateIntervalUI('perf-24h', primaryPair.priceChange.h24);
       }
-
     } catch (err) {
       console.warn("DexScreener Telemetry Interruption:", err.message);
     }
@@ -140,10 +148,9 @@ document.addEventListener('DOMContentLoaded', () => {
     element.className = `percentage ${numericValue >= 0 ? 'text-green' : 'text-red'}`;
   }
 
-  // 2. HIGH-SPEED STATE QUERY VIA BLOCKSCOUT REST CORE API
+  // 2. HIGH-SPEED STATE QUERY VIA BLOCKSCOUT
   async function queryOnChainStateByAPI() {
     try {
-      // PERBAIKAN: Parameter disesuaikan murni dengan REST specification standar Blockscout Core API
       const [supplyRes, burnRes] = await Promise.all([
         fetch(`${CONFIG.explorerApiUrl}?module=token&action=gettoken&contractaddress=${CONFIG.tokenAddress}`),
         fetch(`${CONFIG.explorerApiUrl}?module=account&action=tokenbalance&contractaddress=${CONFIG.tokenAddress}&address=${CONFIG.burnAddress}`)
@@ -180,8 +187,6 @@ document.addEventListener('DOMContentLoaded', () => {
         rpcStatus.textContent = "Indexer Synced";
         rpcStatus.className = "text-green";
       }
-      if (tickerText) tickerText.textContent = `⚡ HIGH-SPEED INDEXING SYSTEM ACTIVE · Telemetry synced via Blockscout Endpoint`;
-
     } catch (e) {
       console.error("Blockscout State Bridge Error:", e);
       if (rpcStatus) {
@@ -192,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // 3. RETRIEVE HISTORICAL BURN LEDGER FROM BLOCKSCOUT CORE LOGS
+  // 3. RETRIEVE HISTORICAL BURN LEDGER
   async function fetchLedgerHistoryByAPI() {
     try {
       const response = await fetch(`${CONFIG.explorerApiUrl}?module=account&action=tokentx&contractaddress=${CONFIG.tokenAddress}&address=${CONFIG.burnAddress}&page=1&offset=15&sort=desc`);
@@ -222,25 +227,19 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             ledgerContainer.appendChild(row);
           });
-        } else {
-          ledgerContainer.innerHTML = `<div class="loading-text">No burn actions inside indexing window. Standing by...</div>`;
         }
       }
     } catch (err) {
       console.warn("Ledger indexing anomaly:", err);
-      if (ledgerContainer) {
-        ledgerContainer.innerHTML = `<div class="loading-text" style="color:var(--text-muted);">Ledger temporarily offline. Market metrics still active.</div>`;
-      }
     }
   }
 
-  // RUNTIME INITIAL PIPELINE ROUTER EXECUTION
+  // RUNTIME INITIAL PIPELINE
   fetchMarketTelemetry();
   queryOnChainStateByAPI();
   fetchLedgerHistoryByAPI();
 
-  // SECURE LIFECYCLE TIMING POLLING SYSTEM
-  setInterval(fetchMarketTelemetry, 15000);   
-  setInterval(queryOnChainStateByAPI, 30000);  
-  setInterval(fetchLedgerHistoryByAPI, 30000); 
+  setInterval(fetchMarketTelemetry, 15000);
+  setInterval(queryOnChainStateByAPI, 30000);
+  setInterval(fetchLedgerHistoryByAPI, 30000);
 });
